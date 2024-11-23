@@ -7,81 +7,11 @@
 #include <dirent.h>
 #include <curses.h>
 #include <sys/ioctl.h>
-
+#include <sys/wait.h> // 추가
 
 // 전역 변수들
 char option[100];
 int row, col;
-
-// 프로세스 정보를 저장할 구조체 // MEM 추가
-typedef struct {
-    int pid; // 프로세스 ID
-    char name[256]; // 프로세스 이름
-    unsigned long mem_usage; // 메모리 사용량
-} ProcessInfo;
-
-#define MAX_PROCESSES 1024 // 최대 프로세스 개수 제한 // MEM 추가
-
-// 메모리 사용량이 높은 상위 10개 프로세스를 가져오는 함수 // MEM 추가
-void get_top_memory_processes(ProcessInfo *processes, int *count){
-    DIR *proc_dir = opendir("/proc");
-    struct dirent *entry;
-    *count = 0;
-
-    if(!proc_dir){
-        perror("opendir /proc fail");
-
-        return;
-    }
-
-    while((entry=readdir(proc_dir)) != NULL){
-        if(*count >= MAX_PROCESSES){
-            break;
-        }
-
-        if(entry->d_type==DT_DIR && atoi(entry->d_name) > 0){
-            char status_path[256];
-            snprintf(status_path, sizeof(status_path), "/proc/%s/status", entry->d_name);
-
-            FILE *status_file = fopen(status_path, "r");
-            if(!status_file){
-                continue;
-            }
-
-            ProcessInfo pinfo = {0};
-            pinfo.pid = atoi(entry->d_name);
-
-            char line[256];
-            while(fgets(line, sizeof(line), status_file)){
-                if(strncmp(line, "Name:", 5) == 0){
-                    sscanf(line, "Name:\t%s", pinfo.name);
-                } else if(strncmp(line, "VmRSS:", 6) == 0){
-                    sscanf(line, "VmRSS:\t%lu", &pinfo.mem_usage);
-                    
-                    break;
-                }
-            }
-            fclose(status_file);
-
-            if(pinfo.mem_usage > 0){
-                processes[(*count)++] = pinfo;
-            }
-        }
-    }
-
-    closedir(proc_dir);
-
-    // 메모리 사용량이 큰 순으로 내림차순 정렬
-    for(int i = 0; i < *count-1; i++){
-        for(int j = i+1; j < *count; j++){
-            if(processes[i].mem_usage < processes[j].mem_usage){
-                ProcessInfo temp = processes[i];
-                processes[i] = processes[j];
-                processes[j] = temp;
-            }
-        }
-    }
-}
 
 int main()
 {
@@ -94,6 +24,14 @@ int main()
     }
 
     pid_t pid;
+    int pipe_fd[2]; // 파이프 생성용 // 추가
+
+    // 파이프 생성 // 추가
+    if(pipe(pipe_fd) == -1){
+        perror("pipe failed");
+
+        exit(1);
+    }
 
     initscr(); // ncurses 초기화
     echo();    // 입력 문자를 화면에 출력
@@ -163,28 +101,42 @@ int main()
             if (strcmp(option, "MEM") == 0)
             {
                 // 1초 주기로 memory 사용량 높은 순위 10개 목록을 PIPE로 부모한테 보내는 코드
-                ProcessInfo processes[MAX_PROCESSES];
-                int count;
+                close(pipe_fd[0]); // 읽기용 닫기
 
-                get_top_memory_processes(processes, &count);
+                while (1)
+                {
+                    FILE *fp = popen("ps -eo pid,comm,%mem --sort=-%mem | awk 'NR>1'", "r");
 
-                clear();
-                move(1, 1);
-                addstr("Top 10 processes by memory usage:");
-                move(2, 1);
-                addstr("    [Name]                    [PID]      [Memory(KB)]");
+                    if (fp == NULL)
+                    {
+                        perror("popen failed");
+                        exit(1);
+                    }
 
-                for(int j = 0; j<count && j<10; j++){
-                    move(3+j, 1);
-                    char buffer[256];
-                    snprintf(buffer, sizeof(buffer), "%2d. %-25s %-10d %-10lu", j+1, processes[j].name, processes[j].pid, processes[j].mem_usage);
-                    addstr(buffer);
+                    char buffer[1024] = {0};
+                    char result[1024] = {0};
+                    char pid[16], command[256], mem[16];
+                    int rank = 1;
+
+                    strcat(result, "Rank  COMMAND          PID      Memory(Kb)\n");
+
+                    while (fgets(buffer, sizeof(buffer), fp) && rank <= 10)
+                    {
+                        sscanf(buffer, "%s %s %s", pid, command, mem);
+
+                        // %MEM(Kb) 변환
+                        float mem_percent = atof(mem);
+                        long mem_kb = (long)((mem_percent / 100.0) * sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE) / 1024);
+
+                        char line[256];
+                        sprintf(line, "%-5d %-16s %-8s %-10ld\n", rank++, command, pid, mem_kb);
+                        strcat(result, line);
+                    }
+
+                    pclose(fp);
+                    write(pipe_fd[1], result, strlen(result) + 1);
+                    sleep(1);
                 }
-                refresh();
-
-                move(row-2, 1);
-                addstr("Press any key to return to the menu.");
-                getch();
             }
 
             if (strcmp(option, "SEARCH") == 0)
@@ -208,6 +160,33 @@ int main()
             }
             if (strcmp(option, "MEM") == 0)
             {
+                close(pipe_fd[1]); // 쓰기용 닫기
+
+                initscr();
+                cbreak();
+                noecho();
+                nodelay(stdscr, TRUE);
+
+                char buffer[1024];
+
+                while (1)
+                {
+                    memset(buffer, 0, sizeof(buffer));
+                    read(pipe_fd[0], buffer, sizeof(buffer));
+
+                    clear();
+                    mvprintw(0, 0, "Top 10 Memory Usage Processes:");
+                    mvprintw(1, 0, "%s", buffer);
+                    refresh();
+
+                    int ch = getch();
+                    if (ch == 'q')
+                    {
+                        kill(pid, SIGTERM);
+                        waitpid(pid, NULL, 0);
+                        break;
+                    }
+                }
             }
             if (strcmp(option, "SEARCH") == 0)
             {

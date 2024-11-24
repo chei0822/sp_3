@@ -7,6 +7,8 @@
 #include <dirent.h>
 #include <curses.h>
 #include <sys/ioctl.h>
+#include <ctype.h>
+#include <sys/stat.h>
 
 
 // 전역 변수들
@@ -31,6 +33,8 @@ int main()
 
     while (1)
     {
+        int pipefd[2];
+        pipe(pipefd);
         // clear(); // 화면 클리어
         move(1, (col / 2) - 9);       // 커서 이동
         addstr("Process Monitoring"); // 문자열 출력
@@ -70,12 +74,6 @@ int main()
         getstr(option);
         standend();
 
-        int pipefd[2];
-        if (pipe(pipefd) == -1) { 
-            perror("pipe");
-            exit(EXIT_FAILURE);
-        }
-
         if (strcmp(option, "exit") == 0)
         {
             break;
@@ -88,43 +86,87 @@ int main()
         }
 
         pid = fork();
-        //자식프로세스
+
         if (pid == 0)
         {
             if (strcmp(option, "CPU") == 0)
             {
                 // 1초 주기로 CPU 사용량 높은 순위 10개 목록을 PIPE로 부모한테 보내는 코드
-                
             }
             if (strcmp(option, "MEM") == 0)
             {
                 // 1초 주기로 memory 사용량 높은 순위 10개 목록을 PIPE로 부모한테 보내는 코드
             }
-            if (strcmp(option, "SEARCH") == 0||strcmp(option,"search"))
+            if (strcmp(option, "SEARCH") == 0)
             {
                 close(pipefd[0]);
-                char search_query[100];
-                printf("Enter process name or PID to search: ");
-                scanf("%s", search_query);
-                char command[200];
-                sprintf(command, "ps -e -o pid,comm,pcpu,pmem | grep %s", search_query);
 
-                FILE *fp = popen(command, "r");
-                if (!fp)
+                char check_search[100];
+                move(row - 2, 1);
+                addstr("Enter process name or PID to search:");
+                standout();
+                echo();
+                move(row - 1, 1);
+                getstr(check_search);
+                standend();
+                noecho();
+                refresh();
+
+                clear();
+                move(1, (col / 2) - 9);
+                addstr("Search Process Information"); // 제목 출력
+                refresh();
+
+                //proc 파일은 활성 프로세스 및 스레드에 대한 상태 정보가 있다.
+                FILE *fp=fopen("/proc","r");
+
+                if(fp==NULL)
                 {
-                    perror("popen");
-                    exit(EXIT_FAILURE);
+                    perror("Failed to open /proc");
+                    exit(1);
                 }
-                 char buffer[1024];
-
-                while (fgets(buffer, sizeof(buffer), fp))
+                struct dirent *dirent_ptr;
+                DIR *dir=opendir("/proc");
+                if(dir==NULL)
                 {
-                    write(pipefd[1], buffer, strlen(buffer)); // PIPE로 데이터 전송
+                    perror("Failed to open /proc directory");
+                    exit(1);
                 }
 
-                pclose(fp);
-                close(pipefd[1]); // 쓰기 닫기
-                exit(0);
+                char result[1024]="";
+                while((dirent_ptr=readdir(dir))!=NULL)
+                {
+                    char path[300];
+                    snprintf(path, sizeof(path), "/proc/%s", dirent_ptr->d_name);
+
+                    struct stat st;
+                    if(stat(path,&st)==0 && S_ISDIR(st.st_mode))
+                    {
+                        if(isdigit(dirent_ptr->d_name[0]))
+                        {
+                            char status_path[300];
+                            snprintf(status_path, sizeof(status_path), "/proc/%s/status", dirent_ptr->d_name);
+
+                            FILE *fp1 = fopen(status_path, "r");
+                            if (fp1 != NULL)
+                            {
+                                char line[256];
+                                while (fgets(line, sizeof(line), fp1))
+                                {
+                                    if (strncmp(line, "Name:", 5) == 0 || strncmp(line, "Pid:", 4) == 0)
+                                    {
+                                        if (strstr(line, check_search) != NULL)
+                                        {
+                                            strcat(result, line);
+                                        }
+                                    }
+                                }
+                                fclose(fp1);
+                            }
+                        }
+                    }
+                }
+                closedir(dir);
             }
             if (strcmp(option, "CLEAN") == 0)
             {
@@ -145,42 +187,44 @@ int main()
             }
             if (strcmp(option, "SERCH") == 0)
             {
-                // 각 option에 맞는 화면 curses 구현 - while(1)
-		        // "q"를 입력하면 자식 프로세스를 종료시키고 break
-                close(pipefd[1]); // 쓰기 닫기
+                close(pipefd[1]);
 
                 char buffer[1024];
-                int bytes_read;
+                int n_read=read(pipefd[0],buffer,sizeof(buffer)-1);
 
-                while ((bytes_read = read(pipefd[0], buffer, sizeof(buffer) - 1)) > 0)
+                if(n_read>0)
                 {
-                    buffer[bytes_read] = '\0'; // null-terminate the string
-                    move(8, 1);
+                    buffer[n_read]='\0';
+                    clear();
+                    move(3, 1);
                     addstr("Search Results:");
-                    move(9, 1);
-                    addstr(buffer); // 검색 결과 출력
+                    move(5, 1);
+                    addstr(buffer);
                     refresh();
                 }
-
-                close(pipefd[0]); // 읽기 닫기
-
-                move(12, 1);
+                close(pipefd[0]);
+                move(row - 2, 1);
                 addstr("Press 'q' to return to the main menu.");
                 refresh();
-
-                char ch;
-                while ((ch = getch()) != 'q')
-                    ;
-            
+                while(1)
+                {
+                    int ch=getch();
+                    if(ch=='q'||ch=='Q')
+                    {
+                        kill(pid,SIGTERM);
+                        break;
+                    }
+                }
             }
             if (strcmp(option, "CLEAN") == 0)
             {
             }
-        }   
 
-            endwin(); // ncurses 종료
-
-            printf("Exiting safely...\n");
-            return 0;
+        }
     }
+
+    endwin(); // ncurses 종료
+
+    printf("Exiting safely...\n");
+    return 0;
 }

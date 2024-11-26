@@ -114,12 +114,11 @@ int main()
                     }
 
                     char buffer[1024] = {0};
-                    char result[1024] = {0};
+                    char result[2048] = {0}; // 배열 크기 증가
                     char pid[16], command[256], mem[16];
                     int rank = 1;
 
-                    strcat(result, "Rank  COMMAND          PID      Memory(Kb)\n");
-
+                    strcat(result, "Rank  COMMAND          PID      Memory(Kb)  Memory(%)\n"); // % 항목 추가
                     while (fgets(buffer, sizeof(buffer), fp) && rank <= 10)
                     {
                         sscanf(buffer, "%s %s %s", pid, command, mem);
@@ -129,7 +128,7 @@ int main()
                         long mem_kb = (long)((mem_percent / 100.0) * sysconf(_SC_PHYS_PAGES) * sysconf(_SC_PAGE_SIZE) / 1024);
 
                         char line[256];
-                        sprintf(line, "%-5d %-16s %-8s %-10ld\n", rank++, command, pid, mem_kb);
+                        sprintf(line, "%-5d %-16s %-8s %-10ld  %-10.2f\n", rank++, command, pid, mem_kb, mem_percent); // % 항목 추가
                         strcat(result, line);
                     }
 
@@ -167,7 +166,7 @@ int main()
                 noecho();
                 nodelay(stdscr, TRUE);
 
-                char buffer[1024];
+                char buffer[2048]; // 버퍼 크기 증가
 
                 while (1)
                 {
@@ -175,8 +174,24 @@ int main()
                     read(pipe_fd[0], buffer, sizeof(buffer));
 
                     clear();
-                    mvprintw(0, 0, "Top 10 Memory Usage Processes:");
-                    mvprintw(1, 0, "%s", buffer);
+
+                    // 화면 중앙에 내용 출력
+                    int start_row = (row/2)-5; // 중앙 정렬 시작 행
+                    int start_col = (col-50)/2; // 중앙 정렬 시작 열
+
+                    mvprintw(start_row - 2, start_col, "Top 10 Memory Usage Processes:");
+                    
+                    // 행렬 데이터를 각 줄로 나누어 출력
+                    char *line = strtok(buffer, "\n");
+                    int line_count = 0;
+
+                    while (line != NULL)
+                    {
+                        mvprintw(start_row + line_count, start_col, "%s", line); // 각 줄 출력
+                        line = strtok(NULL, "\n");
+                        line_count++;
+                    }
+
                     refresh();
 
                     int ch = getch();

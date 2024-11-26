@@ -83,6 +83,45 @@ void memory_top()
     }
 }
 
+void display_main_menu()
+{
+    clear();                      // 화면 클리어
+    move(1, (col / 2) - 9);       // 커서 이동
+    addstr("Process Monitoring"); // 문자열 출력
+
+    int i = 3;
+
+    move(i++, 1);
+    standout();
+    addstr("Option list");
+    standend();
+
+    move(i++, 1);                                                             // 커서 이동
+    addstr("CPU - View the top 10 processes with the highest CPU usage.");    // 문자열
+                                                                              // 출력
+    move(i++, 1);                                                             // 커서 이동
+    addstr("MEM - View the top 10 processes with the highest Memory usage."); // 문자열
+                                                                              // 출력
+    move(i++, 1);                                                             // 커서 이동
+    addstr("SEARCH - View information about the desired process.");           // 문자열 출력
+    move(i++, 1);                                                             // 커서 이동
+    addstr("CLEAN - Terminates unnecessary processes.");                      // 문자열 출력
+    move(i++, 1);                                                             // 커서 이동
+    addstr("exit - exits the program.");                                      // 문자열 출력
+
+    // 입력 칸 표시
+    move(row - 2, 1);
+    addstr("option:");
+    standout();
+    for (int i = 0; i < col - 10; i++)
+    {
+        addstr(" ");
+    }
+    standend();
+
+    refresh(); // 화면 갱신
+}
+
 int main()
 {
     // SIGINT 신호 설정
@@ -110,55 +149,33 @@ int main()
             exit(1);
         }
 
-        clear();                      // 화면 클리어
-        move(1, (col / 2) - 9);       // 커서 이동
-        addstr("Process Monitoring"); // 문자열 출력
-
-        int i = 3;
-
-        move(i++, 1);
-        standout();
-        addstr("Option list");
-        standend();
-
-        move(i++, 1);                                                             // 커서 이동
-        addstr("CPU - View the top 10 processes with the highest CPU usage.");    // 문자열
-                                                                                  // 출력
-        move(i++, 1);                                                             // 커서 이동
-        addstr("MEM - View the top 10 processes with the highest Memory usage."); // 문자열
-                                                                                  // 출력
-        move(i++, 1);                                                             // 커서 이동
-        addstr("SEARCH - View information about the desired process.");           // 문자열 출력
-        move(i++, 1);                                                             // 커서 이동
-        addstr("CLEAN - Terminates unnecessary processes.");                      // 문자열 출력
-        move(i++, 1);                                                             // 커서 이동
-        addstr("exit - exits the program.");                                      // 문자열 출력
-
-        // 입력 칸 표시
-        move(row - 2, 1);
-        addstr("option:");
-        standout();
-        for (int i = 0; i < col - 10; i++)
-        {
-            addstr(" ");
-        }
-        standend();
-
-        refresh(); // 화면 갱신
+        display_main_menu();
 
         move(row - 2, 9);
         standout();
         getstr(option);
         standend();
 
-        if (strcmp(option, "exit") == 0)
+        while (strcmp(option, "CPU") != 0 && strcmp(option, "MEM") != 0 && strcmp(option, "SERCH") != 0 && strcmp(option, "CLEAN") != 0)
         {
-            endwin(); // ncurses 종료
-            break;
-        }
-        else if (strcmp(option, "CPU") != 0 && strcmp(option, "MEM") != 0 && strcmp(option, "SERCH") != 0 && strcmp(option, "CLEAN") != 0)
-        {
-            continue;
+            if (strcmp(option, "exit") == 0)
+            {
+                endwin(); // ncurses 종료
+                printf("Exiting safely...\n\r");
+                return 0;
+            }
+            move(row - 1, 1);
+            addstr("check option");
+
+            standout();
+            move(row - 2, 9);
+            for (int i = 0; i < col - 10; i++)
+            {
+                addstr(" ");
+            }
+            move(row - 2, 9);
+            getstr(option);
+            standend();
         }
 
         pid = fork();
@@ -181,14 +198,11 @@ int main()
                 close(pipe_fd[0]);
 
                 char pid_input[100];
-                move(row - 4, 1);
+                move(row - 3, 1);
                 addstr("Enter the PID of the process to search: ");
                 standout();
-                echo();
-                move(row - 3, 1);
                 getstr(pid_input);
                 standend();
-                noecho();
 
                 clear();
                 move(1, (col / 2) - 9);
@@ -333,7 +347,7 @@ int main()
                 else
                 {
                     move(row - 2, 1);
-                    addstr("Process termination canceled.");
+                    addstr("ProcessAAA termination canceled.");
                 }
                 move(row, 1);
                 addstr("Press 'q' to return to the main menu.");

@@ -387,40 +387,44 @@ void alarm_process()
 
 void serch_process()
 {
-    close(pipe_fd[0]);
+    close(pipe_fd[0]); // 파이프의 읽기닫ㄱ
 
     char status_path[300];
     snprintf(status_path, sizeof(status_path), "/proc/%s/status", pid_input);
 
     while (1)
     {
-
         FILE *fp = fopen(status_path, "r");
         if (fp == NULL)
         {
-            exit(1);
+            char error_result[1024];
+            snprintf(error_result, sizeof(error_result), "PID: %s\nVmSize: Not found\nVmRSS: Not found\n", pid_input);
+            write(pipe_fd[1], error_result, strlen(error_result));
+            sleep(1);
+            continue;
         }
 
         char line[256];
-        char vm_size[256] = "VmSize: Not found";
-        char vm_rss[256] = "VmRSS: Not found";
+        char vm_size[256] = "Not found";
+        char vm_rss[256] = "Not found";
 
         while (fgets(line, sizeof(line), fp))
         {
             if (strncmp(line, "VmSize:", 7) == 0)
             {
-                strcpy(vm_size, line);
+                sscanf(line, "VmSize: %s", vm_size);
             }
             else if (strncmp(line, "VmRSS:", 6) == 0)
             {
-                strcpy(vm_rss, line);
+                sscanf(line, "VmRSS: %s", vm_rss);
             }
         }
         fclose(fp);
 
         char result[1024];
-        snprintf(result, sizeof(result), "PID: %s\n%s%s", pid_input, vm_size, vm_rss);
-        write(pipe_fd[1], result, strlen(result));
+        snprintf(result, sizeof(result), "PID: %s\nVmSize: %s\nVmRSS: %s\n", pid_input, vm_size, vm_rss);
+        write(pipe_fd[1], result, strlen(result)); // 파이프에 결과 전달
         sleep(1);
     }
 }
+

@@ -54,6 +54,10 @@ int main()
     while (!terminate)
     {
         initscr(); // ncurses 초기화
+
+        start_color();
+        init_pair(1, COLOR_RED, COLOR_BLACK);
+
         echo();    // 입력 문자를 화면에 출력
         curs_set(FALSE);
         // 파이프 생성 // 추가
@@ -67,7 +71,7 @@ int main()
         sort_large_consumed_processes();
         display_main_menu();
 
-        move(row - 2, 9);
+        move(row - 2, 33);
         standout();
         getstr(option);
         standend();
@@ -81,15 +85,19 @@ int main()
                 return 0;
             }
             move(row - 1, 1);
+
+            attron(COLOR_PAIR(1));
             addstr("check option");
+            attroff(COLOR_PAIR(1));
+            refresh();
 
             standout();
-            move(row - 2, 9);
-            for (int i = 0; i < col - 10; i++)
+            move(row - 2, 33);
+            for (int i = 0; i < col - 35; i++)
             {
                 addstr(" ");
             }
-            move(row - 2, 9);
+            move(row - 2, 33);
             getstr(option);
             standend();
         }
@@ -186,13 +194,23 @@ int main()
                     char *line = strtok(buffer, "\n");
                     int line_count = 0;
 
-                    while (line != NULL)
-                    {
+                    while (line != NULL) {
+                        if (line_count < 4 && line_count != 0) {
+                            attron(COLOR_PAIR(1)); // 상위 3개 항목을 빨간색으로
+                        }
+
                         mvprintw(start_row + line_count, start_col, "%s", line);
+                        if (line_count < 4 && line_count != 0) {
+                            attroff(COLOR_PAIR(1)); // 색상 속성 해제
+                        }
+
                         line = strtok(NULL, "\n");
                         line_count++;
                     }
 
+                    attron(COLOR_PAIR(1));
+                    mvprintw(row - 2, 2, "Press 'q' to return to the main menu."); // 메시지 추가
+                    attroff(COLOR_PAIR(1));
                     refresh(); // 화면 갱신
 
                     // 종료 입력
@@ -223,13 +241,23 @@ int main()
                     char *line = strtok(buffer, "\n");
                     int line_count = 0;
 
-                    while (line != NULL)
-                    {
-                        mvprintw(start_row + line_count, start_col, "%s", line); // 각 줄 출력
+                    while (line != NULL) {
+                        if (line_count < 4 && line_count != 0) {
+                            attron(COLOR_PAIR(1)); // 상위 3개 항목을 빨간색으로
+                        }
+
+                        mvprintw(start_row + line_count, start_col, "%s", line);
+                        if (line_count < 4 && line_count != 0) {
+                            attroff(COLOR_PAIR(1)); // 색상 속성 해제
+                        }
+
                         line = strtok(NULL, "\n");
                         line_count++;
                     }
 
+                    attron(COLOR_PAIR(1));
+                    mvprintw(row - 2, 2, "Press 'q' to return to the main menu."); // 메시지 추가
+                    attroff(COLOR_PAIR(1));
                     refresh();
 
                     int ch = getch();
@@ -251,16 +279,28 @@ int main()
                     clear();
                     move(1, (col / 2) - 9);
                     addstr("Process Information\n");
-                    mvprintw(3, 1, "Search Results:");
-                    mvprintw(5, 1, "%s", buffer);
+
+                    // 화면 중앙에 내용 출력
+                    int start_row = (row / 2) - 5;  // 중앙 정렬 시작 행
+                    int start_col = (col - 50) / 2; // 중앙 정렬 시작 열
+
+                    mvprintw(start_row - 2, start_col, "Search Results:");
+                    mvprintw(start_row, start_col, "---------------------------------------------------");
+                    mvprintw(start_row + 1, start_col, "%s", buffer);
+                    mvprintw(start_row + 6, start_col, "---------------------------------------------------");
+                    
 
                     if (n_read == 0)
                     {
-                        mvprintw(5, 1, "Process not found");
+                        attron(COLOR_PAIR(1));
+                        mvprintw(5, 2, "Process not found");
+                        attroff(COLOR_PAIR(1));
 
                         break;
                     }
-                    mvprintw(row - 4, 1, "Do you want to kill this process? (y/n):");
+                    attron(COLOR_PAIR(1));
+                    mvprintw(row - 5, 2, "Do you want to kill this process? (y/n):");
+                    attroff(COLOR_PAIR(1));
                     refresh();
                     int ch = getch();
                     if (ch == 'y' || ch == 'Y')
@@ -271,25 +311,34 @@ int main()
 
                         if (kill(target_pid, SIGTERM) == 0)
                         {
-                            move(row - 3, 1);
-                            addstr("Process terminated successfully.");
+                            move(row - 4, 2);
+                            standout();
+                            addstr("Process termind successfully.");
+                            standend();
                             break;
                         }
                         else
                         {
-                            move(row - 3, 1);
-                            addstr("Failed to terminate the process. Insufficient permissions?");
+                            move(row - 4, 2);
+                            attron(COLOR_PAIR(1));
+                            addstr("Failed to termin the process. Insufficient permissions?");
+                            attroff(COLOR_PAIR(1));
                             break;
                         }
                     }
                     else if (ch == 'n' || ch == 'N')
                     {
-                        mvprintw(row - 3, 1, "Process termination canceled.");
+                        standout();
+                        mvprintw(row - 4, 2, "Process termination canceled.");
+                        standend();
                         break;
                     }
                 }
 
-                mvprintw(row - 2, 1, "Press 'q' to return to the main menu.");
+
+                attron(COLOR_PAIR(1));
+                mvprintw(row - 2, 2, "Press 'q' to return to the main menu."); // 메시지 추가
+                attroff(COLOR_PAIR(1));
                 refresh();
 
                 while (1)
@@ -356,3 +405,4 @@ int main()
     printf("Exiting safely...\n\r");
     return 0;
 }
+

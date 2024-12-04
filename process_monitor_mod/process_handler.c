@@ -166,12 +166,16 @@ void sort_low_priority_processes()
 // 우선순위가 낮은 프로세스를 종료하는 함수
 void terminate_low_priority_processes()
 {
+
+    // 결과 문자열 형식화
+    int pad_width = (col - 50) / 2; // 중앙 정렬을 위한 계산
+
     int cursor_line = 1;
-    mvprintw(cursor_line++, 1, "===== low_priority_processes =====");
+    mvprintw(cursor_line++, pad_width, "========= low_priority_processes =========");
 
     if (low_priority_count == 0)
     {
-        mvprintw(cursor_line++, 1, "No low priority processes to terminate.");
+        mvprintw(cursor_line++, 1, "No low priority processes to termin.");
         mvprintw(cursor_line, 1, "=====================================\n");
         return;
     }
@@ -180,14 +184,19 @@ void terminate_low_priority_processes()
     int found = 0;
     for (int i = 0; i < low_priority_count - 1; i++)
     {
+
         if (low_priority_processes[i].memory > 0)
         {
             ProcessInfo target_process = low_priority_processes[i];
-            mvprintw(cursor_line++, 1, "Lowest Priority Process with Memory > 0 \n %s (PID: %d), Memory: %lu kB, Priority: %d\n", target_process.name, target_process.pid, target_process.memory,
-                     target_process.priority);
+
+            cursor_line += 1;
+            mvprintw(cursor_line++, pad_width + 3, "Lowest Priority Process with Memory > 0 \n");
+            mvprintw(cursor_line++, pad_width - 8, "----------------------------------------------------------");
+            mvprintw(cursor_line++, pad_width - 7, "%s (PID: %d), Memory: %lu kB, Priority: %d\n", target_process.name, target_process.pid, target_process.memory, target_process.priority);
+            mvprintw(cursor_line++, pad_width - 8, "----------------------------------------------------------");
 
             cursor_line += 3;
-            mvprintw(cursor_line++, 1, "Do you want to kill this process? (y/n):");
+            mvprintw(row - 2, 1, "Do you want to kill this process? (y/n):");
             refresh();
             int ch = getch();
             if (ch == 'y' || ch == 'Y')
@@ -199,14 +208,18 @@ void terminate_low_priority_processes()
                     break;
                 }
                 else
-                {
-                    mvprintw(cursor_line++, 1, "Failed to terminate the process. Insufficient permissions?");
+                {   
+                    attron(COLOR_PAIR(1));
+                    mvprintw(cursor_line++, 1, "Failed to termin the process. Insufficient permissions?");
+                    attron(COLOR_PAIR(1));
                     break;
                 }
             }
             else
             {
+                attron(COLOR_PAIR(1));
                 mvprintw(cursor_line++, 1, "Process termination canceled.");
+                attroff(COLOR_PAIR(1));
                 break;
             }
 
@@ -219,10 +232,12 @@ void terminate_low_priority_processes()
     // 메모리가 0보다 큰 프로세스를 찾지 못한 경우
     if (!found)
     {
-        mvprintw(cursor_line++, 1, "No process with Memory > 0 to terminate.");
+        attron(COLOR_PAIR(1));
+        mvprintw(cursor_line++, 1, "No process with Memory > 0 to termin.");
+        attroff(COLOR_PAIR(1));
     }
-    mvprintw(cursor_line, 1, "=====================================\n");
 }
+
 void cpu_top() {
     close(pipe_fd[0]); // 읽기용 파이프 닫기
     while (1) {

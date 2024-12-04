@@ -280,51 +280,54 @@ int main()
                     move(1, (col / 2) - 9);
                     addstr("Process Information\n");
 
-                    // 화면 중앙에 내용 출력
+                    char pid[100], vm_size[100], vm_rss[100];
+                    sscanf(buffer, "PID: %s\nVmSize: %s\nVmRSS: %s\n", pid, vm_size, vm_rss);
+
+                    // 화면 중앙에 출력
                     int start_row = (row / 2) - 5;  // 중앙 정렬 시작 행
                     int start_col = (col - 50) / 2; // 중앙 정렬 시작 열
 
                     mvprintw(start_row - 2, start_col, "Search Results:");
-                    mvprintw(start_row, start_col, "---------------------------------------------------");
-                    mvprintw(start_row + 1, start_col, "%s", buffer);
-                    mvprintw(start_row + 6, start_col, "---------------------------------------------------");
-                    
+                    mvprintw(start_row, start_col, "----------------------------------------");
+                    mvprintw(start_row + 1, start_col, "| %-10s | %-15s | %-5s |", "Field", "Value", "Unit");
+                    mvprintw(start_row + 2, start_col, "----------------------------------------");
+                    mvprintw(start_row + 3, start_col, "| %-10s | %-15s | %-5s |", "PID", pid, "");
+                    mvprintw(start_row + 4, start_col, "| %-10s | %-15s | %-5s |", "VmSize", vm_size, "kB");
+                    mvprintw(start_row + 5, start_col, "| %-10s | %-15s | %-5s |", "VmRSS", vm_rss, "kB");
+                    mvprintw(start_row + 6, start_col, "----------------------------------------");
 
                     if (n_read == 0)
                     {
                         attron(COLOR_PAIR(1));
                         mvprintw(5, 2, "Process not found");
                         attroff(COLOR_PAIR(1));
-
                         break;
                     }
+
                     attron(COLOR_PAIR(1));
                     mvprintw(row - 5, 2, "Do you want to kill this process? (y/n):");
                     attroff(COLOR_PAIR(1));
                     refresh();
+
                     int ch = getch();
                     if (ch == 'y' || ch == 'Y')
                     {
-                        char pid_to_kill[100];
-                        sscanf(buffer, "PID: %s", pid_to_kill); // PID 추출
-                        pid_t target_pid = atoi(pid_to_kill);
-
+                        pid_t target_pid = atoi(pid); // PID 직접 사용
                         if (kill(target_pid, SIGTERM) == 0)
                         {
                             move(row - 4, 2);
                             standout();
-                            addstr("Process termind successfully.");
+                            addstr("Process terminated successfully.");
                             standend();
-                            break;
                         }
                         else
                         {
                             move(row - 4, 2);
                             attron(COLOR_PAIR(1));
-                            addstr("Failed to termin the process. Insufficient permissions?");
+                            addstr("Failed to terminate the process. Insufficient permissions?");
                             attroff(COLOR_PAIR(1));
-                            break;
                         }
+                        break;
                     }
                     else if (ch == 'n' || ch == 'N')
                     {
@@ -335,24 +338,22 @@ int main()
                     }
                 }
 
-
                 attron(COLOR_PAIR(1));
-                mvprintw(row - 2, 2, "Press 'q' to return to the main menu."); // 메시지 추가
+                mvprintw(row - 2, 2, "Press 'q' to return to the main menu.");
                 attroff(COLOR_PAIR(1));
                 refresh();
 
                 while (1)
                 {
                     int ch = getch();
-                    // 메인메뉴로빠져나가기
                     if (ch == 'q' || ch == 'Q')
                     {
-                        // kill(pid,SIGTERM);
                         clear();
                         break;
                     }
                 }
             }
+
             if (strcmp(option, "ALARM") == 0)
             {
                 while (1)
@@ -405,4 +406,5 @@ int main()
     printf("Exiting safely...\n\r");
     return 0;
 }
+
 
